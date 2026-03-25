@@ -1,0 +1,14 @@
+definition_version: 2
+entities:
+  monthly_sales_dashboard:
+    type: streamlit
+    identifier:
+      name: MONTHLY_SALES_DASHBOARD
+      database: TSHO_DB
+      schema: TFT_DEMO_2026
+    query_warehouse: TSHO_WH_XL
+    external_access_integrations:
+      - PYPI_ACCESS_INTEGRATION
+    main_file: streamlit_app_sis.py
+    artifacts:
+      - streamlit_app_sis.py
