@@ -15,7 +15,7 @@ Deploy a monthly sales dashboard to Snowflake as a Streamlit in Snowflake (SiS) 
 - A Snowflake account with a `SIS_DASHBOARD_DEMO` table in `TSHO_DB.TSHO_SCHEMA`
 - The `PYPI_ACCESS_INTEGRATION` external access integration created in your account
 
-## Prompt
+## Prompt for Creating SiS Dashboard
 
 ```
  Create a Streamlit-in-Snowflake (SiS) Python app for a Monthly Sales Dashboard that reads
@@ -74,7 +74,7 @@ Deploy a monthly sales dashboard to Snowflake as a Streamlit in Snowflake (SiS) 
 - **Detail data table** -- expandable raw data view
 - **Sidebar filters** -- region, category, and year range
 
-## Deploy
+## Manual Deploy
 
 ```bash
 snow streamlit deploy monthly_sales_dashboard
