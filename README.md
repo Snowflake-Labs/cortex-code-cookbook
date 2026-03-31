@@ -6,11 +6,9 @@ A collection of cookbook-style recipes for [Cortex Code](https://docs.snowflake.
 
 ```
 cortex-code-cookbook/
-├── .github/
-│   └── workflows/
-│       └── ruff.yml                 # CI: ruff lint + format checks
-├── cook-book/
-│   └── sis-dashboard-deploy/        # Recipe: Streamlit-in-Snowflake sales dashboard
+├── cookbook/
+│   └── sis/
+│       └── sis-dashboard-deploy/    # Recipe: Streamlit-in-Snowflake sales dashboard
 ├── AGENTS.md                        # Agent notes and lessons learned
 ├── LICENSE                          # Apache License 2.0
 ├── pyproject.toml                   # Project config, ruff lint rules
@@ -21,7 +19,7 @@ cortex-code-cookbook/
 
 | Recipe | Description |
 |---|---|
-| [sis-dashboard-deploy](cook-book/sis-dashboard-deploy/) | Deploy a monthly sales dashboard to Snowflake as a Streamlit-in-Snowflake (SiS) app |
+| [sis-dashboard-deploy](cookbook/sis/sis-dashboard-deploy/) | Deploy a monthly sales dashboard to Snowflake as a Streamlit-in-Snowflake (SiS) app |
 
 ## Prerequisites
 
