@@ -7,6 +7,8 @@ A collection of cookbook-style recipes for [Cortex Code](https://docs.snowflake.
 ```
 cortex-code-cookbook/
 ├── cookbook/
+│   ├── ml/
+│   │   └── forecast-sales/          # Recipe: Sales forecasting with SNOWFLAKE.ML.FORECAST
 │   └── sis/
 │       └── sis-dashboard-deploy/    # Recipe: Streamlit-in-Snowflake sales dashboard
 ├── AGENTS.md                        # Agent notes and lessons learned
@@ -19,6 +21,7 @@ cortex-code-cookbook/
 
 | Recipe | Description |
 |---|---|
+| [forecast-sales](cookbook/ml/forecast-sales/) | Forecast monthly sales with `SNOWFLAKE.ML.FORECAST` using Cortex Code prompts |
 | [sis-dashboard-deploy](cookbook/sis/sis-dashboard-deploy/) | Deploy a monthly sales dashboard to Snowflake as a Streamlit-in-Snowflake (SiS) app |
 
 ## Prerequisites
