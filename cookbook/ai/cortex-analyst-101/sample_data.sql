@@ -1,4 +1,4 @@
--- Sample data for the Standard Cortex Analyst recipe.
+-- Sample data for the Cortex Analyst 101 recipe.
 -- Run this as ACCOUNTADMIN (or a role with sufficient privileges).
 
 -- ---------------------------------------------------------------------------

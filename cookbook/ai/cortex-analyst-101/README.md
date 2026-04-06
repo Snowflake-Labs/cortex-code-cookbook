@@ -1,4 +1,4 @@
-# Standard Cortex Analyst
+# Cortex Analyst 101
 
 Use Cortex Analyst to ask natural-language questions against a semantic model and get SQL answers -- all driven by Cortex Code prompts.
 
