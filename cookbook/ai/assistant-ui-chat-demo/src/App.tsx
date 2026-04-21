@@ -4,6 +4,7 @@ import {
   type ChatModelAdapter,
   type ThreadMessage,
 } from "@assistant-ui/react";
+import { createContext, useContext, useRef, useState, type FC, type ReactNode } from "react";
 import { Thread } from "./thread";
 import snowflakeMark from "./assets/snowflake.svg";
 
@@ -26,21 +27,26 @@ type ServerEvent =
   | { type: "permission-resolved"; id: string; allowed: boolean }
   | { type: "error"; message: string };
 
+// --- Permission context ---
+
 export type PermissionState =
-  | { status: "pending"; id: string; toolName: string; input: Record<string, unknown> }
+  | { status: "pending"; id: string; toolName: string }
   | { status: "allowed" }
   | { status: "denied" };
 
-export type ToolCallPart = {
-  type: "tool-call";
-  toolCallId: string;
-  toolName: string;
-  args: Record<string, unknown>;
-  result?: string;
-  permission?: PermissionState;
+type PermissionMap = Record<string, PermissionState | undefined>;
+
+type PermissionContextValue = {
+  permissions: PermissionMap;
 };
 
-async function respondPermission(id: string, allow: boolean) {
+const PermissionContext = createContext<PermissionContextValue>({ permissions: {} });
+
+export function usePermission(toolCallId: string): PermissionState | undefined {
+  return useContext(PermissionContext).permissions[toolCallId];
+}
+
+export async function respondPermission(id: string, allow: boolean) {
   await fetch(`/api/permission/${id}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -48,112 +54,130 @@ async function respondPermission(id: string, allow: boolean) {
   });
 }
 
-const CortexAgentAdapter: ChatModelAdapter = {
-  async *run({ messages, abortSignal }) {
-    const prompt = lastUserText(messages);
+// --- Adapter ---
 
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
-      signal: abortSignal,
-    });
+function createAdapter(
+  setPermissions: React.Dispatch<React.SetStateAction<PermissionMap>>,
+): ChatModelAdapter {
+  return {
+    async *run({ messages, abortSignal }) {
+      const prompt = lastUserText(messages);
 
-    if (!response.ok || !response.body) {
-      throw new Error(`chat request failed: ${response.status}`);
-    }
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+        signal: abortSignal,
+      });
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let text = "";
+      if (!response.ok || !response.body) {
+        throw new Error(`chat request failed: ${response.status}`);
+      }
 
-    const toolCalls = new Map<string, ToolCallPart>();
-    const toolOrder: string[] = [];
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let text = "";
 
-    // permission id → tool call id (most recent tool when request arrives)
-    const permToTool = new Map<string, string>();
+      type ToolPart = { type: "tool-call"; toolCallId: string; toolName: string; args: Record<string, unknown>; result?: string };
+      const toolCalls = new Map<string, ToolPart>();
+      const toolOrder: string[] = [];
+      const permToTool = new Map<string, string>();
 
-    const buildContent = () => {
-      const parts: (ToolCallPart | { type: "text"; text: string })[] = [];
-      for (const id of toolOrder) parts.push(toolCalls.get(id)!);
-      if (text) parts.push({ type: "text", text });
-      return parts;
-    };
+      const buildContent = () => {
+        const parts: (ToolPart | { type: "text"; text: string })[] = [];
+        for (const id of toolOrder) parts.push(toolCalls.get(id)!);
+        if (text) parts.push({ type: "text", text });
+        return parts;
+      };
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
 
-      for (const line of lines) {
-        if (!line) continue;
-        const event = JSON.parse(line) as ServerEvent;
+        for (const line of lines) {
+          if (!line) continue;
+          const event = JSON.parse(line) as ServerEvent;
 
-        if (event.type === "text-delta") {
-          text += (text ? "\n\n" : "") + event.text;
-          yield { content: buildContent() as never };
+          if (event.type === "text-delta") {
+            text += (text ? "\n\n" : "") + event.text;
+            yield { content: buildContent() as never };
 
-        } else if (event.type === "tool-use") {
-          toolCalls.set(event.id, {
-            type: "tool-call",
-            toolCallId: event.id,
-            toolName: event.name,
-            args: event.input,
-          });
-          toolOrder.push(event.id);
-          yield { content: buildContent() as never };
+          } else if (event.type === "tool-use") {
+            toolCalls.set(event.id, {
+              type: "tool-call",
+              toolCallId: event.id,
+              toolName: event.name,
+              args: event.input,
+            });
+            toolOrder.push(event.id);
+            yield { content: buildContent() as never };
 
-        } else if (event.type === "tool-result") {
-          const call = toolCalls.get(event.tool_use_id);
-          if (call) call.result = event.content;
-          yield { content: buildContent() as never };
+          } else if (event.type === "tool-result") {
+            const call = toolCalls.get(event.tool_use_id);
+            if (call) call.result = event.content;
+            yield { content: buildContent() as never };
 
-        } else if (event.type === "permission-request") {
-          // Associate with the most recent tool call that has no permission yet
-          let targetId = toolOrder[toolOrder.length - 1];
-          for (let i = toolOrder.length - 1; i >= 0; i--) {
-            if (!toolCalls.get(toolOrder[i])!.permission) { targetId = toolOrder[i]; break; }
+          } else if (event.type === "permission-request") {
+            let targetId = toolOrder[toolOrder.length - 1];
+            for (let i = toolOrder.length - 1; i >= 0; i--) {
+              const id = toolOrder[i];
+              setPermissions(prev => {
+                if (!prev[id]) targetId = id;
+                return prev;
+              });
+            }
+            permToTool.set(event.id, targetId);
+            setPermissions(prev => ({
+              ...prev,
+              [targetId]: { status: "pending", id: event.id, toolName: event.toolName },
+            }));
+            yield { content: buildContent() as never };
+
+          } else if (event.type === "permission-resolved") {
+            const toolId = permToTool.get(event.id);
+            if (toolId) {
+              setPermissions(prev => ({
+                ...prev,
+                [toolId]: { status: event.allowed ? "allowed" : "denied" },
+              }));
+            }
+            yield { content: buildContent() as never };
+
+          } else if (event.type === "error") {
+            throw new Error(event.message);
           }
-          permToTool.set(event.id, targetId);
-
-          const call = toolCalls.get(targetId);
-          if (call) {
-            call.permission = {
-              status: "pending",
-              id: event.id,
-              toolName: event.toolName,
-              input: event.input,
-            };
-          }
-          yield { content: buildContent() as never };
-
-        } else if (event.type === "permission-resolved") {
-          const toolId = permToTool.get(event.id);
-          if (toolId) {
-            const call = toolCalls.get(toolId);
-            if (call) call.permission = { status: event.allowed ? "allowed" : "denied" };
-          }
-          yield { content: buildContent() as never };
-
-        } else if (event.type === "error") {
-          throw new Error(event.message);
         }
       }
-    }
-  },
-};
+    },
+  };
+}
 
-export { respondPermission };
+// --- App ---
 
-export function App() {
-  const runtime = useLocalRuntime(CortexAgentAdapter);
+const PermissionProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const [permissions, setPermissions] = useState<PermissionMap>({});
+  const adapterRef = useRef<ChatModelAdapter | null>(null);
+  if (!adapterRef.current) adapterRef.current = createAdapter(setPermissions);
+
+  const runtime = useLocalRuntime(adapterRef.current);
 
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
+    <PermissionContext.Provider value={{ permissions }}>
+      <AssistantRuntimeProvider runtime={runtime}>
+        {children}
+      </AssistantRuntimeProvider>
+    </PermissionContext.Provider>
+  );
+};
+
+export function App() {
+  return (
+    <PermissionProvider>
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
         <header
           style={{
@@ -175,6 +199,6 @@ export function App() {
           <Thread />
         </main>
       </div>
-    </AssistantRuntimeProvider>
+    </PermissionProvider>
   );
 }

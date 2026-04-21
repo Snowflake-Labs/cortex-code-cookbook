@@ -2,7 +2,7 @@ import {
   ComposerPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
-  useMessage,
+  type ToolCallMessagePartProps,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 import { makePrismLightSyntaxHighlighter } from "@assistant-ui/react-syntax-highlighter";
@@ -10,8 +10,7 @@ import sql from "react-syntax-highlighter/dist/esm/languages/prism/sql";
 import { PrismLight } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { FC } from "react";
-import type { ToolCallPart } from "./App";
-import { respondPermission } from "./App";
+import { usePermission, respondPermission } from "./App";
 
 PrismLight.registerLanguage("sql", sql);
 
@@ -19,11 +18,13 @@ const SyntaxHighlighter = makePrismLightSyntaxHighlighter({
   style: oneDark,
   customStyle: {
     margin: 0,
-    borderRadius: "0 0 var(--radius-sm) var(--radius-sm)",
+    borderRadius: 0,
     fontSize: "0.8125rem",
     lineHeight: 1.6,
   },
 });
+
+// --- Thread ---
 
 export const Thread: FC = () => (
   <ThreadPrimitive.Root
@@ -48,29 +49,19 @@ export const Thread: FC = () => (
       }}
     >
       <ThreadPrimitive.Empty>
-        <div
-          style={{
-            textAlign: "center",
-            color: "var(--fg-muted)",
-            marginTop: "4rem",
-            fontSize: "0.9375rem",
-          }}
-        >
+        <div style={{ textAlign: "center", color: "var(--fg-muted)", marginTop: "4rem", fontSize: "0.9375rem" }}>
           Ask Cortex Code anything.
         </div>
       </ThreadPrimitive.Empty>
 
-      <ThreadPrimitive.Messages
-        components={{
-          UserMessage,
-          AssistantMessage,
-        }}
-      />
+      <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
     </ThreadPrimitive.Viewport>
 
     <Composer />
   </ThreadPrimitive.Root>
 );
+
+// --- Messages ---
 
 const UserMessage: FC = () => (
   <MessagePrimitive.Root
@@ -90,48 +81,36 @@ const UserMessage: FC = () => (
   </MessagePrimitive.Root>
 );
 
-const AssistantMessage: FC = () => {
-  const message = useMessage();
-  const parts = message.content as unknown as (ToolCallPart | { type: "text"; text: string })[];
-
-  return (
-    <MessagePrimitive.Root
-      style={{
-        alignSelf: "flex-start",
-        background: "var(--bg-assistant)",
-        color: "var(--fg-default)",
-        borderRadius: "var(--radius-lg)",
-        margin: "0.375rem 0",
-        maxWidth: "85%",
-        border: "1px solid var(--border-subtle)",
-        overflow: "hidden",
+const AssistantMessage: FC = () => (
+  <MessagePrimitive.Root
+    style={{
+      alignSelf: "flex-start",
+      background: "var(--bg-assistant)",
+      color: "var(--fg-default)",
+      borderRadius: "var(--radius-lg)",
+      margin: "0.375rem 0",
+      maxWidth: "85%",
+      border: "1px solid var(--border-subtle)",
+      overflow: "hidden",
+    }}
+  >
+    <MessagePrimitive.Parts
+      components={{
+        Text: () => (
+          <div style={{ padding: "0.625rem 0.875rem" }}>
+            <MarkdownTextPrimitive
+              components={{ SyntaxHighlighter }}
+              containerProps={{ style: { fontSize: "0.9375rem", lineHeight: 1.65 } }}
+            />
+          </div>
+        ),
+        tools: { Fallback: ToolCard },
       }}
-    >
-      {parts.map((part, i) => {
-        if (part.type === "tool-call") {
-          return <ToolCard key={i} part={part} />;
-        }
-        if (part.type === "text") {
-          return (
-            <div key={i} style={{ padding: "0.625rem 0.875rem" }}>
-              <MessagePrimitive.Parts
-                components={{
-                  Text: () => (
-                    <MarkdownTextPrimitive
-                      components={{ SyntaxHighlighter }}
-                      containerProps={{ style: { fontSize: "0.9375rem", lineHeight: 1.65 } }}
-                    />
-                  ),
-                }}
-              />
-            </div>
-          );
-        }
-        return null;
-      })}
-    </MessagePrimitive.Root>
-  );
-};
+    />
+  </MessagePrimitive.Root>
+);
+
+// --- Tool card ---
 
 const TOOL_LABELS: Record<string, string> = {
   sql_execute: "SQL Query",
@@ -145,63 +124,71 @@ const TOOL_LABELS: Record<string, string> = {
   web_search: "Web search",
 };
 
-const ToolCard: FC<{ part: ToolCallPart }> = ({ part }) => {
-  const label = TOOL_LABELS[part.toolName] ?? part.toolName;
-  const isSql = part.toolName === "sql_execute";
-  const sqlText = isSql ? ((part.args as { sql?: string })?.sql ?? "") : null;
-  const description = isSql ? (part.args as { description?: string })?.description : null;
-  const rows = isSql ? parseResult(part.result) : null;
-  const perm = part.permission;
+const ToolCard: FC<ToolCallMessagePartProps> = ({ toolCallId, toolName, args, result, status }) => {
+  const perm = usePermission(toolCallId);
+  const label = TOOL_LABELS[toolName] ?? toolName;
+  const isSql = toolName === "sql_execute";
+  const sqlText = isSql ? (args as { sql?: string })?.sql ?? "" : null;
+  const description = isSql ? (args as { description?: string })?.description : null;
+  const rows = isSql && result ? parseRowCount(result as string) : null;
+  const isPending = perm?.status === "pending";
+  const isDone = status.type === "complete";
 
   return (
-    <div style={{ borderBottom: "1px solid var(--border-subtle)", fontSize: "0.8125rem" }}>
+    <div style={{
+      borderBottom: "1px solid var(--border-subtle)",
+      borderLeft: isDone
+        ? "2px solid var(--border-subtle)"
+        : isPending
+          ? "2px solid #f59e0b"
+          : "2px solid var(--sf-sky)",
+      transition: "border-left-color 400ms ease",
+    }}>
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          padding: "0.5rem 0.875rem",
-          borderBottom: perm?.status === "pending" ? "none" : "1px solid var(--border-subtle)",
-          background: "var(--bg-tool-header)",
-          color: "var(--fg-muted)",
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.5rem",
+        padding: "0.5rem 0.75rem 0.5rem 0.625rem",
+        background: "var(--bg-tool-header)",
+        borderBottom: isPending ? "none" : "1px solid var(--border-subtle)",
+      }}>
+        <ToolIcon name={toolName} />
+        <span style={{
+          fontSize: "0.6875rem",
           fontWeight: 600,
-          fontSize: "0.75rem",
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        <ToolIcon name={part.toolName} />
-        {description ?? label}
+          letterSpacing: "0.07em",
+          color: "var(--fg-muted)",
+          fontFamily: "var(--font-mono)",
+        }}>
+          {description ?? label}
+        </span>
 
-        {/* Status badge — right-aligned */}
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.375rem" }}>
-          {perm?.status === "allowed" && (
-            <StatusBadge color="green"><CheckIcon /> allowed</StatusBadge>
-          )}
-          {perm?.status === "denied" && (
-            <StatusBadge color="red"><DenyIcon /> denied</StatusBadge>
-          )}
-          {perm?.status !== "pending" && part.result && rows !== null && (
-            <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "var(--fg-success)" }}>
+          {perm?.status === "allowed" && <StatusBadge color="green"><CheckIcon /> allowed</StatusBadge>}
+          {perm?.status === "denied" && <StatusBadge color="red"><DenyIcon /> denied</StatusBadge>}
+          {!isPending && isDone && rows !== null && (
+            <span style={{ fontSize: "0.6875rem", fontFamily: "var(--font-mono)", color: "var(--fg-success)", fontWeight: 500 }}>
               {rows} row{rows !== 1 ? "s" : ""}
             </span>
           )}
-          {perm?.status !== "pending" && part.result && rows === null && (
-            <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "var(--fg-success)" }}>
+          {!isPending && isDone && rows === null && (
+            <span style={{ fontSize: "0.6875rem", fontFamily: "var(--font-mono)", color: "var(--fg-success)", fontWeight: 500 }}>
               done
             </span>
           )}
-          {!perm && !part.result && (
-            <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "var(--fg-muted)" }}>
-              running…
-            </span>
+          {!perm && !isDone && (
+            <span style={{ fontSize: "0.6875rem", fontFamily: "var(--font-mono)", color: "var(--fg-muted)" }}>executing…</span>
+          )}
+          {isPending && (
+            <span style={{ fontSize: "0.6875rem", fontFamily: "var(--font-mono)", color: "#f59e0b", fontWeight: 500 }}>awaiting approval</span>
           )}
         </span>
       </div>
 
-      {/* Permission prompt — shown instead of content while pending */}
-      {perm?.status === "pending" && (
+      {/* Permission prompt */}
+      {isPending && perm && (
         <PermissionPrompt
           toolName={perm.toolName}
           onAllow={() => respondPermission(perm.id, true)}
@@ -209,36 +196,35 @@ const ToolCard: FC<{ part: ToolCallPart }> = ({ part }) => {
         />
       )}
 
-      {/* Content — hidden until permission granted (or no permission needed) */}
-      {perm?.status !== "pending" && (
+      {/* Content */}
+      {!isPending && (
         <>
           {isSql && sqlText && (
             <SyntaxHighlighter
               language="sql"
               code={sqlText}
               components={{
-                Pre: ({ children, ...p }) => <pre {...p} style={{ margin: 0 }}>{children}</pre>,
+                Pre: ({ children, ...p }) => <pre {...p} style={{ margin: 0, borderRadius: 0 }}>{children}</pre>,
                 Code: ({ children, ...p }) => <code {...p}>{children}</code>,
               }}
             />
           )}
           {!isSql && (
-            <pre
-              style={{
-                margin: 0,
-                padding: "0.5rem 0.875rem",
-                fontSize: "0.75rem",
-                fontFamily: "var(--font-mono)",
-                color: "var(--fg-muted)",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-all",
-              }}
-            >
-              {JSON.stringify(part.args, null, 2)}
+            <pre style={{
+              margin: 0,
+              padding: "0.625rem 0.75rem",
+              fontSize: "0.75rem",
+              fontFamily: "var(--font-mono)",
+              color: "var(--fg-muted)",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+              background: "var(--bg-tool-header)",
+            }}>
+              {JSON.stringify(args, null, 2)}
             </pre>
           )}
-          {isSql && rows !== null && rows > 0 && part.result && (
-            <ResultTable raw={part.result} />
+          {isSql && rows !== null && rows > 0 && result && (
+            <ResultTable raw={result as string} />
           )}
         </>
       )}
@@ -246,10 +232,15 @@ const ToolCard: FC<{ part: ToolCallPart }> = ({ part }) => {
   );
 };
 
-function parseResult(raw: string | undefined): number | null {
-  if (!raw) return null;
+// --- Result table ---
+
+function parseRowCount(raw: string): number | null {
   const m = raw.match(/^(\d+) row/);
   return m ? parseInt(m[1], 10) : null;
+}
+
+function looksNumeric(s: string): boolean {
+  return s.length > 0 && !isNaN(Number(s));
 }
 
 const ResultTable: FC<{ raw: string }> = ({ raw }) => {
@@ -262,29 +253,39 @@ const ResultTable: FC<{ raw: string }> = ({ raw }) => {
 
   return (
     <div style={{ overflowX: "auto", borderTop: "1px solid var(--border-subtle)" }}>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: "0.8125rem",
-          fontFamily: "var(--font-mono)",
-        }}
-      >
+      <table style={{
+        width: "100%",
+        borderCollapse: "collapse",
+        fontSize: "0.75rem",
+        fontFamily: "var(--font-mono)",
+      }}>
         <thead>
-          <tr>
+          <tr style={{ background: "var(--bg-tool-header)" }}>
+            <th style={{
+              width: 32,
+              padding: "0.3125rem 0.5rem",
+              textAlign: "right",
+              color: "transparent",
+              borderBottom: "1px solid var(--border-subtle)",
+              borderRight: "1px solid var(--border-subtle)",
+              userSelect: "none",
+              fontSize: "0.6875rem",
+            }}>
+              #
+            </th>
             {headers.map((h, i) => (
-              <th
-                key={i}
-                style={{
-                  padding: "0.375rem 0.875rem",
-                  textAlign: "left",
-                  color: "var(--fg-muted)",
-                  fontWeight: 600,
-                  borderBottom: "1px solid var(--border-subtle)",
-                  background: "var(--bg-tool-header)",
-                  whiteSpace: "nowrap",
-                }}
-              >
+              <th key={i} style={{
+                padding: "0.3125rem 0.875rem 0.3125rem 0.625rem",
+                textAlign: "left",
+                color: "var(--fg-muted)",
+                fontWeight: 600,
+                fontSize: "0.6875rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                borderBottom: "1px solid var(--border-subtle)",
+                borderRight: i < headers.length - 1 ? "1px solid var(--border-subtle)" : "none",
+                whiteSpace: "nowrap",
+              }}>
                 {h}
               </th>
             ))}
@@ -294,20 +295,32 @@ const ResultTable: FC<{ raw: string }> = ({ raw }) => {
           {dataLines.map((line, ri) => {
             const cells = line.split(/\s{2,}/);
             return (
-              <tr key={ri}>
+              <tr key={ri} style={{ background: ri % 2 !== 0 ? "rgba(0,0,0,0.018)" : "transparent" }}>
+                <td style={{
+                  padding: "0.3125rem 0.5rem",
+                  textAlign: "right",
+                  color: "var(--fg-muted)",
+                  fontSize: "0.625rem",
+                  opacity: 0.5,
+                  borderRight: "1px solid var(--border-subtle)",
+                  userSelect: "none",
+                  borderBottom: ri < dataLines.length - 1 ? "1px solid var(--border-subtle)" : "none",
+                }}>
+                  {ri + 1}
+                </td>
                 {cells.map((cell, ci) => (
-                  <td
-                    key={ci}
-                    style={{
-                      padding: "0.375rem 0.875rem",
-                      color: "var(--fg-default)",
-                      borderBottom:
-                        ri < dataLines.length - 1
-                          ? "1px solid var(--border-subtle)"
-                          : "none",
-                    }}
-                  >
-                    {cell}
+                  <td key={ci} style={{
+                    padding: "0.3125rem 0.875rem 0.3125rem 0.625rem",
+                    color: "var(--fg-default)",
+                    borderBottom: ri < dataLines.length - 1 ? "1px solid var(--border-subtle)" : "none",
+                    borderRight: ci < cells.length - 1 ? "1px solid var(--border-subtle)" : "none",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {looksNumeric(cell) ? (
+                      <span style={{ color: "var(--sf-sky)", fontVariantNumeric: "tabular-nums" }}>{cell}</span>
+                    ) : cell === "null" || cell === "NULL" ? (
+                      <span style={{ color: "var(--fg-muted)", fontStyle: "italic", opacity: 0.6 }}>null</span>
+                    ) : cell}
                   </td>
                 ))}
               </tr>
@@ -318,6 +331,64 @@ const ResultTable: FC<{ raw: string }> = ({ raw }) => {
     </div>
   );
 };
+
+// --- Permission prompt ---
+
+const PermissionPrompt: FC<{ toolName: string; onAllow: () => void; onDeny: () => void }> = ({
+  toolName, onAllow, onDeny,
+}) => (
+  <div style={{
+    padding: "0.75rem 0.75rem 0.75rem 0.625rem",
+    background: "var(--bg-surface)",
+    borderTop: "1px solid var(--border-subtle)",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.75rem",
+  }}>
+    <span style={{
+      width: 6, height: 6, borderRadius: "50%", background: "#f59e0b",
+      boxShadow: "0 0 0 3px rgba(245,158,11,0.18)", flexShrink: 0,
+    }} />
+    <span style={{ flex: 1, fontSize: "0.8125rem", color: "var(--fg-default)", lineHeight: 1.4 }}>
+      Allow agent to run{" "}
+      <code style={{
+        fontFamily: "var(--font-mono)", fontSize: "0.75rem",
+        background: "var(--bg-tool-header)", border: "1px solid var(--border-subtle)",
+        borderRadius: 4, padding: "0 0.3em", color: "var(--sf-sky)",
+      }}>{toolName}</code>?
+    </span>
+    <div style={{ display: "flex", gap: "0.375rem", flexShrink: 0 }}>
+      <button onClick={onDeny} style={{
+        border: "1px solid var(--border-default)", borderRadius: 6,
+        padding: "0.25rem 0.625rem", fontSize: "0.75rem", fontWeight: 500,
+        cursor: "pointer", background: "transparent", color: "var(--fg-muted)",
+        fontFamily: "var(--font-mono)", letterSpacing: "0.02em",
+      }}>deny</button>
+      <button onClick={onAllow} style={{
+        border: "none", borderRadius: 6, padding: "0.25rem 0.625rem",
+        fontSize: "0.75rem", fontWeight: 600, cursor: "pointer",
+        background: "var(--sf-blue-50)", color: "#fff",
+        fontFamily: "var(--font-mono)", letterSpacing: "0.02em",
+      }}>allow</button>
+    </div>
+  </div>
+);
+
+// --- Small components ---
+
+const StatusBadge: FC<{ color: "green" | "red"; children: React.ReactNode }> = ({ color, children }) => (
+  <span style={{
+    display: "inline-flex", alignItems: "center", gap: "0.2rem",
+    padding: "0.1rem 0.4rem", borderRadius: 4,
+    fontSize: "0.625rem", fontWeight: 600,
+    fontFamily: "var(--font-mono)", letterSpacing: "0.04em",
+    background: color === "green" ? "rgba(29,180,100,0.1)" : "rgba(211,19,47,0.08)",
+    color: color === "green" ? "var(--fg-success)" : "var(--sf-red-50)",
+    border: color === "green" ? "1px solid rgba(29,180,100,0.2)" : "1px solid rgba(211,19,47,0.15)",
+  }}>
+    {children}
+  </span>
+);
 
 const ToolIcon: FC<{ name: string }> = ({ name }) => {
   if (name === "sql_execute") return <DbIcon />;
@@ -331,134 +402,46 @@ const DbIcon: FC = () => (
     <path d="M8 1C4.13 1 1 2.57 1 4.5v7C1 13.43 4.13 15 8 15s7-1.57 7-3.5v-7C15 2.57 11.87 1 8 1zm5.5 10.5c0 .83-2.24 2-5.5 2s-5.5-1.17-5.5-2V9.77C3.68 10.53 5.73 11 8 11s4.32-.47 5.5-1.23v1.73zm0-4c0 .83-2.24 2-5.5 2s-5.5-1.17-5.5-2V5.77C3.68 6.53 5.73 7 8 7s4.32-.47 5.5-1.23v1.73zM8 5.5C4.74 5.5 2.5 4.33 2.5 3.5S4.74 1.5 8 1.5s5.5 1.17 5.5 2-2.24 2-5.5 2z" />
   </svg>
 );
-
 const TerminalIcon: FC = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style={{ opacity: 0.7 }}>
     <path d="M2 2.5A.5.5 0 0 1 2.5 2h11a.5.5 0 0 1 .5.5v11a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11zm1 1v10h10v-10H3zm2.354 2.146a.5.5 0 1 0-.708.708L6.293 8 4.646 9.646a.5.5 0 0 0 .708.708l2-2a.5.5 0 0 0 0-.708l-2-2zM8 9.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5z" />
   </svg>
 );
-
 const FileIcon: FC = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style={{ opacity: 0.7 }}>
     <path d="M9.5 1.5a.5.5 0 0 0-.5-.5H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6a.5.5 0 0 0-.146-.354L9.5 1.5zm0 1.207L12.293 6H10a.5.5 0 0 1-.5-.5V2.707zM4 2h4.5v3.5A1.5 1.5 0 0 0 10 7h3v7H4V2z" />
   </svg>
 );
-
 const CodeIcon: FC = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style={{ opacity: 0.7 }}>
     <path d="M10.478 1.647a.5.5 0 1 0-.956-.294l-4 13a.5.5 0 0 0 .956.294l4-13zM4.854 4.146a.5.5 0 0 1 0 .708L1.707 8l3.147 3.146a.5.5 0 0 1-.708.708l-3.5-3.5a.5.5 0 0 1 0-.708l3.5-3.5a.5.5 0 0 1 .708 0zm6.292 0a.5.5 0 0 0 0 .708L14.293 8l-3.147 3.146a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5a.5.5 0 0 0-.708 0z" />
   </svg>
 );
-
 const CheckIcon: FC = () => (
   <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor">
     <path d="M10.28 2.28L4.75 7.81 1.72 4.78a.75.75 0 0 0-1.06 1.06l3.5 3.5a.75.75 0 0 0 1.06 0l6-6a.75.75 0 0 0-1.06-1.06z" />
   </svg>
 );
-
 const DenyIcon: FC = () => (
   <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor">
     <path d="M1.47 1.47a.75.75 0 0 1 1.06 0L6 4.94l3.47-3.47a.75.75 0 1 1 1.06 1.06L7.06 6l3.47 3.47a.75.75 0 1 1-1.06 1.06L6 7.06 2.53 10.53a.75.75 0 0 1-1.06-1.06L4.94 6 1.47 2.53a.75.75 0 0 1 0-1.06z" />
   </svg>
 );
 
-const StatusBadge: FC<{ color: "green" | "red"; children: React.ReactNode }> = ({ color, children }) => (
-  <span
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: "0.25rem",
-      padding: "0.125rem 0.5rem",
-      borderRadius: 99,
-      fontSize: "0.6875rem",
-      fontWeight: 500,
-      textTransform: "none",
-      letterSpacing: 0,
-      background: color === "green" ? "rgba(29, 180, 100, 0.12)" : "rgba(211, 19, 47, 0.1)",
-      color: color === "green" ? "var(--fg-success)" : "var(--sf-red-50)",
-      border: color === "green" ? "1px solid rgba(29, 180, 100, 0.25)" : "1px solid rgba(211, 19, 47, 0.2)",
-    }}
-  >
-    {children}
-  </span>
-);
-
-const PermissionPrompt: FC<{ toolName: string; onAllow: () => void; onDeny: () => void }> = ({
-  toolName,
-  onAllow,
-  onDeny,
-}) => (
-  <div
-    style={{
-      padding: "0.75rem 0.875rem",
-      borderTop: "1px solid var(--border-subtle)",
-      display: "flex",
-      alignItems: "center",
-      gap: "0.75rem",
-      background: "var(--bg-surface)",
-    }}
-  >
-    <span style={{ flex: 1, fontSize: "0.8125rem", color: "var(--fg-default)" }}>
-      Allow <strong>{toolName}</strong>?
-    </span>
-    <button
-      onClick={onDeny}
-      style={{
-        border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-sm)",
-        padding: "0.25rem 0.75rem",
-        fontSize: "0.8125rem",
-        fontWeight: 500,
-        cursor: "pointer",
-        background: "var(--bg-surface)",
-        color: "var(--fg-default)",
-        fontFamily: "inherit",
-      }}
-    >
-      Deny
-    </button>
-    <button
-      onClick={onAllow}
-      style={{
-        border: "none",
-        borderRadius: "var(--radius-sm)",
-        padding: "0.25rem 0.75rem",
-        fontSize: "0.8125rem",
-        fontWeight: 600,
-        cursor: "pointer",
-        background: "var(--bg-user)",
-        color: "var(--fg-on-brand)",
-        fontFamily: "inherit",
-      }}
-    >
-      Allow
-    </button>
-  </div>
-);
+// --- Composer ---
 
 const composerButton: React.CSSProperties = {
-  border: "none",
-  borderRadius: "var(--radius-sm)",
-  padding: "0 0.875rem",
-  height: "2rem",
-  alignSelf: "flex-end",
-  cursor: "pointer",
-  fontWeight: 600,
-  fontSize: "0.875rem",
-  transition: "background 120ms ease",
+  border: "none", borderRadius: "var(--radius-sm)", padding: "0 0.875rem",
+  height: "2rem", alignSelf: "flex-end", cursor: "pointer",
+  fontWeight: 600, fontSize: "0.875rem", transition: "background 120ms ease",
 };
 
 const Composer: FC = () => (
   <ComposerPrimitive.Root
     style={{
-      display: "flex",
-      gap: "0.5rem",
-      alignItems: "flex-end",
-      border: "1px solid var(--border-default)",
-      borderRadius: "var(--radius-md)",
-      padding: "0.5rem",
-      background: "var(--bg-surface)",
-      boxShadow: "var(--shadow-sm)",
+      display: "flex", gap: "0.5rem", alignItems: "flex-end",
+      border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)",
+      padding: "0.5rem", background: "var(--bg-surface)", boxShadow: "var(--shadow-sm)",
     }}
   >
     <ComposerPrimitive.Input
@@ -466,35 +449,18 @@ const Composer: FC = () => (
       rows={1}
       autoFocus
       style={{
-        flex: 1,
-        border: "none",
-        outline: "none",
-        resize: "none",
-        fontSize: "0.9375rem",
-        background: "transparent",
-        color: "var(--fg-default)",
-        padding: "0.25rem 0.375rem",
+        flex: 1, border: "none", outline: "none", resize: "none",
+        fontSize: "0.9375rem", background: "transparent",
+        color: "var(--fg-default)", padding: "0.25rem 0.375rem",
       }}
     />
     <ThreadPrimitive.If running={false}>
-      <ComposerPrimitive.Send
-        style={{
-          ...composerButton,
-          background: "var(--bg-user)",
-          color: "var(--fg-on-brand)",
-        }}
-      >
+      <ComposerPrimitive.Send style={{ ...composerButton, background: "var(--bg-user)", color: "var(--fg-on-brand)" }}>
         Send
       </ComposerPrimitive.Send>
     </ThreadPrimitive.If>
     <ThreadPrimitive.If running>
-      <ComposerPrimitive.Cancel
-        style={{
-          ...composerButton,
-          background: "var(--sf-red-50)",
-          color: "var(--fg-on-brand)",
-        }}
-      >
+      <ComposerPrimitive.Cancel style={{ ...composerButton, background: "var(--sf-red-50)", color: "var(--fg-on-brand)" }}>
         Stop
       </ComposerPrimitive.Cancel>
     </ThreadPrimitive.If>
