@@ -1,0 +1,89 @@
+:root {
+  --sf-blue-50: #1a6ce7;
+  --sf-blue-60: #085bd7;
+  --sf-sky: #29b5e8;
+
+  --sf-gray-00: #fbfbfb;
+  --sf-gray-05: #f4f6f9;
+  --sf-gray-10: #f7f7f7;
+  --sf-gray-15: #eceef1;
+  --sf-gray-20: #dee3ea;
+  --sf-gray-50: #9fabc1;
+  --sf-gray-80: #293246;
+  --sf-gray-90: #191e24;
+
+  --sf-red-50: #d3132f;
+
+  --bg-page: var(--sf-gray-05);
+  --bg-surface: #ffffff;
+  --bg-assistant: var(--sf-gray-10);
+  --bg-tool-header: var(--sf-gray-15);
+  --bg-user: var(--sf-blue-50);
+  --bg-user-hover: var(--sf-blue-60);
+
+  --fg-default: var(--sf-gray-80);
+  --fg-muted: var(--sf-gray-50);
+  --fg-on-brand: #ffffff;
+  --fg-success: #1a8a45;
+
+  --border-subtle: var(--sf-gray-15);
+  --border-default: var(--sf-gray-20);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 1px 2px rgba(25, 30, 36, 0.04), 0 1px 3px rgba(25, 30, 36, 0.06);
+  --shadow-md: 0 4px 12px rgba(25, 30, 36, 0.08);
+
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+    sans-serif;
+  --font-mono:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-page: var(--sf-gray-90);
+    --bg-surface: #20262f;
+    --bg-assistant: #232b38;
+    --bg-tool-header: #1e2530;
+
+    --fg-default: var(--sf-gray-00);
+    --fg-muted: var(--sf-gray-50);
+    --fg-success: #3dba6a;
+
+    --border-subtle: #2e3748;
+    --border-default: #3a455a;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg-page);
+  color: var(--fg-default);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100%;
+}
+
+button {
+  font-family: inherit;
+}
+
+textarea {
+  font-family: inherit;
+}

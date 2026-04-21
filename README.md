@@ -8,7 +8,8 @@ A collection of cookbook-style recipes for [Cortex Code](https://docs.snowflake.
 cortex-code-cookbook/
 ├── cookbook/
 │   ├── ai/
-│   │   └── cortex-analyst-101/       # Recipe: Natural-language queries with Cortex Analyst
+│   │   ├── cortex-analyst-101/       # Recipe: Natural-language queries with Cortex Analyst
+│   │   └── assistant-ui-chat-demo/   # Recipe: Chat UI with assistant-ui + Cortex Code Agent SDK
 │   ├── data-engineering/
 │   │   └── snowpark-data-pipeline/   # Recipe: Snowpark Python transformation pipeline
 │   ├── ml/
@@ -28,6 +29,7 @@ cortex-code-cookbook/
 | Category | Recipe | Description |
 |---|---|---|
 | ai | [cortex-analyst-101](cookbook/ai/cortex-analyst-101/) | Natural-language queries against a semantic model with Cortex Analyst |
+| ai | [assistant-ui-chat-demo](cookbook/ai/assistant-ui-chat-demo/) | Vite + React chat UI using assistant-ui primitives, wired to `@snowflake/cortex-code-agent-sdk` |
 | data-engineering | [snowpark-data-pipeline](cookbook/data-engineering/snowpark-data-pipeline/) | Snowpark Python pipeline: ingest, transform, and write curated output tables |
 | ml | [forecast-sales](cookbook/ml/forecast-sales/) | Forecast monthly sales with `SNOWFLAKE.ML.FORECAST` using Cortex Code prompts |
 | sis | [sis-dashboard-deploy](cookbook/sis/sis-dashboard-deploy/) | Deploy a monthly sales dashboard to Snowflake as a Streamlit-in-Snowflake (SiS) app |
