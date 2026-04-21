@@ -18,6 +18,22 @@ function lastUserText(messages: readonly ThreadMessage[]): string {
   return "";
 }
 
+type ServerEvent =
+  | { type: "text-delta"; text: string }
+  | { type: "tool-use"; id: string; name: string; input: Record<string, unknown> }
+  | { type: "tool-result"; tool_use_id: string; content: string }
+  | { type: "permission-check"; toolName: string; input: Record<string, unknown>; toolUseId?: string }
+  | { type: "error"; message: string };
+
+export type ToolCallPart = {
+  type: "tool-call";
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  result?: string;
+  permitted?: boolean;
+};
+
 const CortexAgentAdapter: ChatModelAdapter = {
   async *run({ messages, abortSignal }) {
     const prompt = lastUserText(messages);
@@ -38,6 +54,18 @@ const CortexAgentAdapter: ChatModelAdapter = {
     let buffer = "";
     let text = "";
 
+    const toolCalls = new Map<string, ToolCallPart>();
+    const toolOrder: string[] = [];
+
+    const buildContent = () => {
+      const parts: (ToolCallPart | { type: "text"; text: string })[] = [];
+      for (const id of toolOrder) {
+        parts.push(toolCalls.get(id)!);
+      }
+      if (text) parts.push({ type: "text", text });
+      return parts;
+    };
+
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -48,13 +76,38 @@ const CortexAgentAdapter: ChatModelAdapter = {
 
       for (const line of lines) {
         if (!line) continue;
-        const event = JSON.parse(line) as
-          | { type: "text-delta"; text: string }
-          | { type: "error"; message: string };
+        const event = JSON.parse(line) as ServerEvent;
 
         if (event.type === "text-delta") {
           text += (text ? "\n\n" : "") + event.text;
-          yield { content: [{ type: "text", text }] };
+          yield { content: buildContent() as never };
+        } else if (event.type === "tool-use") {
+          toolCalls.set(event.id, {
+            type: "tool-call",
+            toolCallId: event.id,
+            toolName: event.name,
+            args: event.input,
+          });
+          toolOrder.push(event.id);
+          yield { content: buildContent() as never };
+        } else if (event.type === "tool-result") {
+          const call = toolCalls.get(event.tool_use_id);
+          if (call) call.result = event.content;
+          yield { content: buildContent() as never };
+        } else if (event.type === "permission-check") {
+          // Match by toolUseId if available, otherwise by most recent unpermitted call
+          if (event.toolUseId && toolCalls.has(event.toolUseId)) {
+            toolCalls.get(event.toolUseId)!.permitted = true;
+          } else {
+            for (let i = toolOrder.length - 1; i >= 0; i--) {
+              const call = toolCalls.get(toolOrder[i])!;
+              if (!call.permitted) {
+                call.permitted = true;
+                break;
+              }
+            }
+          }
+          yield { content: buildContent() as never };
         } else if (event.type === "error") {
           throw new Error(event.message);
         }

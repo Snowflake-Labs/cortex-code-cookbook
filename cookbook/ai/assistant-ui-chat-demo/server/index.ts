@@ -27,19 +27,39 @@ app.post("/api/chat", async (req, res) => {
       cwd: process.cwd(),
       connection: process.env.SNOWFLAKE_CONNECTION,
       model: process.env.CORTEX_MODEL,
-      permissionMode: "bypassPermissions",
-      allowDangerouslySkipPermissions: true,
       abortController: abort,
       extraArgs: { "no-auto-update": null },
+      canUseTool: async (toolName, input, context) => {
+        write({ type: "permission-check", toolName, input, toolUseId: context.toolUseID });
+        return { behavior: "allow" };
+      },
     },
   });
 
   try {
     for await (const event of q) {
-      if (event.type !== "assistant") continue;
-      for (const block of event.content) {
-        if (block.type === "text" && block.text) {
-          write({ type: "text-delta", text: block.text });
+      if (event.type === "assistant") {
+        for (const block of event.content) {
+          if (block.type === "text" && block.text) {
+            write({ type: "text-delta", text: block.text });
+          } else if (block.type === "tool_use") {
+            write({
+              type: "tool-use",
+              id: block.id,
+              name: block.name,
+              input: block.input,
+            });
+          }
+        }
+      } else if (event.type === "user") {
+        for (const block of event.message.content) {
+          if (block.type === "tool_result") {
+            write({
+              type: "tool-result",
+              tool_use_id: block.tool_use_id,
+              content: typeof block.content === "string" ? block.content : JSON.stringify(block.content),
+            });
+          }
         }
       }
     }
