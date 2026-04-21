@@ -1,21 +1,18 @@
 # assistant-ui Chat Demo
 
-A minimal **Vite + React** chat app that renders the [assistant-ui](https://www.assistant-ui.com/) `<Thread />` and drives it with [`@snowflake/cortex-code-agent-sdk`](https://www.npmjs.com/package/@snowflake/cortex-code-agent-sdk) on a small Express backend.
+A minimal **Vite + React** chat app that renders the [assistant-ui](https://www.assistant-ui.com/) `<Thread />` and drives it with [`cortex-code-agent-sdk`](https://www.npmjs.com/package/cortex-code-agent-sdk) on a small Express backend.
 
-The frontend is pure assistant-ui primitives. The Express server spawns a Cortex Code session via the public SDK, streams assistant text events back as NDJSON, and a custom `ChatModelAdapter` on the client yields each new assistant turn into the thread.
+The frontend is pure assistant-ui primitives with syntax-highlighted SQL, result tables, and a user permission prompt (allow/deny) before each tool call. The Express server spawns a Cortex Code session via the SDK, streams events back as NDJSON, and a custom `ChatModelAdapter` on the client yields each turn into the thread.
 
 ## Files
 
 | File | Description |
 |---|---|
 | `src/App.tsx` | Renders `<Thread />` inside `AssistantRuntimeProvider` and wires a custom `ChatModelAdapter` via `useLocalRuntime` |
-| `src/thread.tsx` | Minimal Thread / Composer UI using `@assistant-ui/react` primitives (no markdown, no tooltips) |
+| `src/thread.tsx` | Thread / Composer UI using `@assistant-ui/react` primitives with tool cards, SQL highlighting, result tables, and permission prompts |
 | `src/main.tsx` | React entrypoint |
-| `server/index.ts` | Express server. Calls `query()` from `@snowflake/cortex-code-agent-sdk` and streams `assistant` text blocks back as NDJSON |
+| `server/index.ts` | Express server. Calls `query()` from `cortex-code-agent-sdk` and streams `assistant` text blocks back as NDJSON |
 | `vite.config.ts` | Vite config; proxies `/api` → `http://localhost:8787` |
-
-> **Note:** `@snowflake/cortex-code-agent-sdk` is not yet published to npm. Until it is, install it from the in-repo source by replacing the dependency in `package.json` with:
-> `"@snowflake/cortex-code-agent-sdk": "file:/path/to/cortex/cortexagent/codingagent/public-cortex-code-agent-sdk-typescript"`
 
 ## Prerequisites
 
@@ -52,7 +49,5 @@ Open http://localhost:5173 and send a message. Each user turn spawns a one-shot 
 
 ## Extending the demo
 
-- **Tool-use visibility**: emit `tool_use` / `tool_result` blocks from the server and render them as custom message parts in `thread.tsx`.
 - **Thinking**: forward `thinking` blocks when `includePartialMessages: true` is set on `query()` options.
 - **Multi-turn memory**: replace `query()` with `createCortexCodeSession()` so the same session persists across HTTP calls (keyed by a session ID in a cookie or header).
-- **Permissions**: this demo sets `permissionMode: "bypassPermissions"` so the agent runs without prompting. Swap in a `canUseTool` handler to gate tool calls through the browser.

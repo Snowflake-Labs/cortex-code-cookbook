@@ -15,7 +15,7 @@
     "@assistant-ui/react": "^0.12.25",
     "@assistant-ui/react-markdown": "^0.12.9",
     "@assistant-ui/react-syntax-highlighter": "^0.12.9",
-    "@snowflake/cortex-code-agent-sdk": "^1.0.0",
+    "cortex-code-agent-sdk": "^1.0.0",
     "express": "^4.21.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

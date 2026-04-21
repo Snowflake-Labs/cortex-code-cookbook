@@ -1,5 +1,5 @@
 import express from "express";
-import { query, type PermissionResult } from "@snowflake/cortex-code-agent-sdk";
+import { query, type PermissionResult } from "cortex-code-agent-sdk";
 import { randomUUID } from "node:crypto";
 
 const app = express();
