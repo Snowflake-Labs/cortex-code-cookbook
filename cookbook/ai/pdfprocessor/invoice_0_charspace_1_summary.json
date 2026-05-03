@@ -1,0 +1,32 @@
+{
+  "document_type": "invoice",
+  "title": "Invoice",
+  "invoice_number": "12060439",
+  "invoice_date": "08/29/2020",
+  "due_date": null,
+  "sender_name": "Brown-Johnson",
+  "sender_address": "310 Amanda Corner Suite 472 North William, MN 33119",
+  "sender_tax_id": "981-94-7235",
+  "sender_iban": "GB781XYE58273701690538",
+  "recipient_name": "Calderon-Duran",
+  "recipient_address": "9884 Roberts Tunnel North Lindaside, VA 02674",
+  "recipient_tax_id": "996-81-8911",
+  "line_items": {
+    "description": [
+      "Rectangle Area Rug Wood Grain Carpet Mat for Living Room Bedroom - 180x60cm",
+      "Rug for living room-Minion And Banana Area Rugs Living Room Carpet, Christmas...",
+      "Yilong 5'x7.5' Hand Knotted Silk Area Rug Medium Size Classic Floor Carpets 0186"
+    ],
+    "quantity": ["4.00", "2.00", "3.00"],
+    "unit": ["each", "each", "each"],
+    "net_price": ["131,24", "59,92", "8 400,00"],
+    "net_worth": ["524,96", "119,84", "25 200,00"],
+    "vat_rate": ["10", "10", "10"],
+    "gross_worth": ["144,36", "65,91", "9 240,00"]
+  },
+  "total_net": "8591.16",
+  "total_vat": "$ 859,12",
+  "total_gross": "$ 9 450,28",
+  "payment_reference": null,
+  "summary": "This is an invoice for the purchase of various rugs and carpets. It was issued by Brown-Johnson to Calderon-Duran. The purpose of the invoice is to provide a record of the transaction and to show the total amount paid."
+}
