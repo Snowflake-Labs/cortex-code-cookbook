@@ -1,0 +1,35 @@
+INVOICE SUMMARY
+===============
+Document Type : invoice
+Title         : Invoice
+Invoice No.   : 12060439
+Issue Date    : 08/29/2020
+
+FROM
+----
+Brown-Johnson
+310 Amanda Corner Suite 472 North William, MN 33119
+Tax ID : 981-94-7235
+IBAN   : GB781XYE58273701690538
+
+TO
+--
+Calderon-Duran
+9884 Roberts Tunnel North Lindaside, VA 02674
+Tax ID : 996-81-8911
+
+LINE ITEMS
+----------
+  - Rectangle Area Rug Wood Grain Carpet Mat for Living Room Bedroom - 180x60cm | Qty: 4.00 each | Net: 131,24 | Net worth: 524,96 | VAT: 10% | Gross: 144,36
+  - Rug for living room-Minion And Banana Area Rugs Living Room Carpet, Christmas... | Qty: 2.00 each | Net: 59,92 | Net worth: 119,84 | VAT: 10% | Gross: 65,91
+  - Yilong 5'x7.5' Hand Knotted Silk Area Rug Medium Size Classic Floor Carpets 0186 | Qty: 3.00 each | Net: 8 400,00 | Net worth: 25 200,00 | VAT: 10% | Gross: 9 240,00
+
+TOTALS
+------
+Net Total  : 8591.16
+VAT        : $ 859,12
+Gross Total: $ 9 450,28
+
+SUMMARY
+-------
+This is an invoice for the purchase of various rugs and carpets. It was issued by Brown-Johnson to Calderon-Duran. The purpose of the invoice is to provide a record of the transaction and to show the total amount paid.
